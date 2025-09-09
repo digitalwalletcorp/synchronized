@@ -1,6 +1,6 @@
 {
   "name": "@digitalwalletcorp/synchronized",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "This is a library for making synchronized block",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
@@ -9,13 +9,15 @@
     "version:patch": "npm version patch",
     "version:minor": "npm version minor",
     "version:major": "npm version major",
+    "prepack": "rm -rf lib && npm run build",
     "pack": "rm -rf dest && mkdir -p dest && npm pack --pack-destination=dest",
     "publish:npm": "bash ../bin/publish.sh",
     "test:unit": "NODE_OPTIONS=--max-old-space-size=2048 npx jest --runInBand --logHeapUsage --detectOpenHandles --forceExit --errorOnDeprecated --coverage --silent --unhandled-rejections=strict"
   },
   "keywords": [
     "promise",
-    "synchronized"
+    "synchronized",
+    "lock"
   ],
   "author": "satoshi kotaki",
   "license": "MIT",
