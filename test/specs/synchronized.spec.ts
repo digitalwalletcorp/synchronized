@@ -1,8 +1,7 @@
-import { ReentrantLock, Synchronized } from '@/synchronized';
+import { Synchronized, SimpleLock } from '@/synchronized';
 import fs from 'fs';
 
 const waitFunction = (type: 'resolve' | 'reject', msec: number) => {
-  console.log('waitFunction start', type, msec);
   return new Promise<number>((resolve, reject) =>
     setTimeout(() => {
       switch (type) {
@@ -14,100 +13,69 @@ const waitFunction = (type: 'resolve' | 'reject', msec: number) => {
         break;
           default:
       }
-      console.log('waitFunction end', type, msec);
     }, msec)
   );
 };
 
+// ファイルがあれば '\n + 数値' を書き込み、ファイルがなければ数値のみ書き込みする関数
+const appendNumberToFile = async (filepath: string, num: number): Promise<void> => {
+  try {
+    await fs.promises.access(filepath);
+    await fs.promises.appendFile(filepath, `\n${num}`);
+  } catch (error) {
+    await fs.promises.writeFile(filepath, String(num));
+  }
+}
+
 describe('@/synchronized.ts', () => {
   describe('execute', () => {
     it('execute.001.01', async () => {
+      // Synchronizedを使わない場合
+      // 1, 2, 3, 4, 5 と順番にファイルに書き込み処理を行う
+      // ファイルが存在しない場合は自身の数値のみ書き込み
+      // ファイルが存在する場合は'\n'に続けて自身の数値を書き込み
+      // 結果として 1\n2\n3\n4\n5 となることを期待するが、Synchronizedを使わないと期待通りにならないことを確認
       const FILE_PATH = 'output-without-sync.log';
 
-      /**
-       * Checks for a file's existence and appends a number.
-       * This function is vulnerable to race conditions.
-       */
-      async function appendNumberToFile(num: number): Promise<void> {
-        try {
-          // 1. Check if the file exists (this is async)
-          await fs.promises.access(FILE_PATH);
+      try {
+        await fs.promises.unlink(FILE_PATH).catch(() => { /* Ignore error if file doesn't exist */ });
 
-          // If it exists, append with a newline.
-          console.log(`[Run ${num}] File exists. Appending '${'\\n'}${num}'.`);
-          await fs.promises.appendFile(FILE_PATH, `\n${num}`);
-
-        } catch (error) {
-          // If access fails, the file doesn't exist.
-          // Multiple tasks might enter this block concurrently!
-          console.log(`[Run ${num}] File does NOT exist. Creating with '${num}'.`);
-          await fs.promises.writeFile(FILE_PATH, String(num));
+        const tasks = [];
+        for (let i = 1; i <= 5; i++) {
+          tasks.push(appendNumberToFile(FILE_PATH, i));
         }
+
+        // 追加した関数を非同期実行
+        await Promise.all(tasks);
+
+        const finalContent = await fs.promises.readFile(FILE_PATH, 'utf-8');
+        expect(finalContent).not.toBe('1\n2\n3\n4\n5');
+      } finally {
+        await fs.promises.unlink(FILE_PATH).catch(() => { /* Ignore error if file doesn't exist */ });
       }
-
-      // Ensure the file doesn't exist before starting
-      await fs.promises.unlink(FILE_PATH).catch(() => { /* Ignore error if file doesn't exist */ });
-
-      console.log('Starting 5 concurrent file operations WITHOUT synchronization...');
-
-      const tasks = [];
-      for (let i = 1; i <= 5; i++) {
-        tasks.push(appendNumberToFile(i));
-      }
-
-      // Run all tasks concurrently to simulate simultaneous requests.
-      await Promise.all(tasks);
-
-      const finalContent = await fs.promises.readFile(FILE_PATH, 'utf-8');
-      console.log('\n--- Final File Content (without sync) ---');
-      console.log(finalContent);
-      console.log('-----------------------------------------');
-
-      // Clearing
-      await fs.promises.unlink(FILE_PATH).catch(() => { /* Ignore error if file doesn't exist */ });
-
-      expect(finalContent).not.toBe('1\n2\n3\n4\n5');
     });
     it('execute.001.02', async () => {
+      // Synchronizedを使う場合
+      // 1, 2, 3, 4, 5 と順番にファイルに書き込み処理を行う
+      // ファイルが存在しない場合は自身の数値のみ書き込み
+      // ファイルが存在する場合は'\n'に続けて自身の数値を書き込み
+      // 結果として 1\n2\n3\n4\n5 となることを期待するが、Synchronizedを使うことで期待通りになることを確認
       const FILE_PATH = 'output-with-sync.log';
       const synchronized = new Synchronized();
 
-      /**
-       * This function is now internally synchronized.
-       * Callers can use it concurrently without worrying about race conditions.
-       */
-      async function appendNumberToFile(num: number): Promise<void> {
-        return synchronized.execute(async () => {
-          try {
-            await fs.promises.access(FILE_PATH);
-            console.log(`[Run ${num}] File exists. Appending '${'\\n'}${num}'.`);
-            await fs.promises.appendFile(FILE_PATH, `\n${num}`);
-          } catch (error) {
-            console.log(`[Run ${num}] File does NOT exist. Creating with '${num}'.`);
-            await fs.promises.writeFile(FILE_PATH, String(num));
-          }
-        });
-      }
-
-      // Ensure the file doesn't exist before starting
       await fs.promises.unlink(FILE_PATH).catch(() => { /* Ignore error if file doesn't exist */ });
-
-      console.log('Starting 5 concurrent file operations WITH synchronization...');
 
       const tasks = [];
       for (let i = 1; i <= 5; i++) {
-        tasks.push(appendNumberToFile(i));
+        // synchronized.executeでラップ
+        tasks.push(synchronized.execute(async () => appendNumberToFile(FILE_PATH, i)));
       }
 
-      // Run all tasks concurrently to simulate simultaneous requests.
+      // 追加した関数を非同期実行
       await Promise.all(tasks);
 
       const finalContent = await fs.promises.readFile(FILE_PATH, 'utf-8');
-      console.log('\n--- Final File Content (with sync) ---');
-      console.log(finalContent);
-      console.log('--------------------------------------');
 
-      // Clearing
       await fs.promises.unlink(FILE_PATH).catch(() => { /* Ignore error if file doesn't exist */ });
 
       expect(finalContent).toBe('1\n2\n3\n4\n5');
@@ -118,7 +86,7 @@ describe('@/synchronized.ts', () => {
       let isRunning = false;
       let currentIndex = 0;
 
-      const lock = new ReentrantLock();
+      const lock = new SimpleLock();
       const synchronizedA = new Synchronized(lock);
       const synchronizedB = new Synchronized(lock);
 
@@ -146,7 +114,7 @@ describe('@/synchronized.ts', () => {
       let isRunning = false;
       let currentIndex = 0;
 
-      const lock = new ReentrantLock();
+      const lock = new SimpleLock();
       const synchronizedA = new Synchronized();
       const synchronizedB = new Synchronized();
 
@@ -170,29 +138,58 @@ describe('@/synchronized.ts', () => {
     });
 
     it('execute.003.01', async () => {
-      // ロックオブジェクトを渡した場合にexecuteのネストでデッドロックにならない確認
-      const lock = new ReentrantLock();
-      const synchronized = new Synchronized(lock);
+      // ロックオブジェクトを指定せずにexecuteのネストをするとデッドロックになる確認
+      // async_hooksパッケージが提供する'AsyncLocalStorage'はNodeJSでのみ動作がサポートされており
+      // ブラウザでは動作しないため、このライブラリなしでは非同期のコンテキストを追跡することができない
+      // そのため、同じロックオブジェクトでネストの呼び出しを行うとデッドロックになる
+      const synchronized = new Synchronized();
       let result;
-      await synchronized.execute(async () => {
-        await synchronized.execute(async () => {
-          await waitFunction('resolve', 10);
-          result = true;
-        });
+      const fn = jest.fn(async () => {
+        await waitFunction('resolve', 10);
+        result = true;
       });
-      expect(result).toBe(true);
-    });
+
+      try {
+        synchronized.execute(async () => {
+          await synchronized.execute(fn);
+        });
+      } catch (error: any) {
+        fail(`Jest detected error: ${error.message}`);
+      }
+      expect(result).toBeUndefined();
+    }, 100); // デッドロックのテストなので100msでタイムアウトさせる
 
     it('execute.003.02', async () => {
-      // ロックオブジェクトを渡さない場合にexecuteのネストでデッドロックにならない確認
+      // 同一ロックオブジェクトを渡した場合にexecuteのネストをするとデッドロックになる確認
+      const synchronized = new Synchronized(new SimpleLock());
+      let result;
+      const fn = jest.fn(async () => {
+        await waitFunction('resolve', 10);
+        result = true;
+      });
+
+      try {
+        synchronized.execute(async () => {
+          await synchronized.execute(fn);
+        });
+      } catch (error: any) {
+        fail(`Jest detected error: ${error.message}`);
+      }
+      expect(result).toBeUndefined();
+    }, 100); // デッドロックのテストなので100msでタイムアウトさせる
+
+    it('execute.003.03', async () => {
+      // executeに異なるロックオブジェクトを渡した場合にexecuteのネストでデッドロックにならない確認
+      const lock1 = new SimpleLock();
+      const lock2 = new SimpleLock();
       const synchronized = new Synchronized();
       let result;
       await synchronized.execute(async () => {
         await synchronized.execute(async () => {
           await waitFunction('resolve', 10);
           result = true;
-        });
-      });
+        }, lock2);
+      }, lock1);
       expect(result).toBe(true);
     });
 
