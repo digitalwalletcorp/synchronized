@@ -14,5 +14,5 @@
       "source.fixAll.stylelint": "never"
     }
   },
-  "liveServer.settings.port": 5501
+  "js/ts.preferences.quoteStyle": "single"
 }

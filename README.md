@@ -6,21 +6,21 @@ A lightweight TypeScript/JavaScript library that provides a simple way to ensure
 
 This is ideal for managing access to shared resources, controlling state changes in UI components, or ensuring sequential execution of database or API calls without complex locking mechanisms.
 
-### ✨ Features
+#### ✨ Features
 
 * Mutual Exclusion: Guarantees that only one `execute` block runs at a time for a given `Synchronized` instance or for a set of calls that share a common lock object.
 * Sequential Execution: Queues up concurrent requests and executes them sequentially in the order they were called.
 * Promise-Based: Works seamlessly with `async/await`, preserving the natural flow of your asynchronous code.
 * Simple API: Extremely easy to use with zero dependencies. Just instantiate `Synchronized` class and wrap your async function with `execute`.
 
-### ✅ Compatibility
+#### ✅ Compatibility
 
 This library is Isomorphic / Universal, meaning it is designed to run in multiple JavaScript environments. It has no dependencies on platform-specific APIs.
 
 - ✅ **Node.js**: Fully supported on all modern Node.js versions.
 - ✅ **Browsers**: Fully supported on all modern browsers that support ES2020 (Promises, async/await).
 
-### 📦 Installation
+#### 📦 Installation
 
 ```bash
 npm install @digitalwalletcorp/synchronized
@@ -28,7 +28,7 @@ npm install @digitalwalletcorp/synchronized
 yarn add @digitalwalletcorp/synchronized
 ```
 
-### 📖 Usage
+#### 📖 Usage
 
 Simply create an instance of the `Synchronized` class and pass your asynchronous function to the `execute` method.
 
@@ -88,7 +88,7 @@ updateUser();
 logTransaction();
 ```
 
-### ⚠️ Important Usage Notes
+##### ⚠️ Important Usage Notes
 
 Due to the nature of JavaScript's asynchronous execution model, nesting `execute` calls with the same lock object **will result in a deadlock**. To avoid this, please do not call `synchronized.execute` from within another `synchronized.execute` call that uses the same or no lock object.
 
@@ -148,7 +148,7 @@ async function runWithoutDeadlock() {
 runWithoutDeadlock(); // This will complete successfully.
 ```
 
-### 📚 API Reference
+#### 📚 API Reference
 
 ##### `new Synchronized(lock?: Lock)`
 
@@ -164,6 +164,6 @@ Wraps and executes an asynchronous function, ensuring mutual exclusion.
 * `lock` (Optional): A common object used for synchronization. If provided, this lock takes precedence over any lock passed to the constructor.
 * Returns: A `Promise<T>` that resolves or rejects with the result of the `asyncFunction`.
 
-### 📜 License
+#### 📜 License
 
 This project is licensed under the MIT License. See the [LICENSE](https://opensource.org/licenses/MIT) file for details.
