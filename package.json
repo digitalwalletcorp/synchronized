@@ -1,11 +1,12 @@
 {
   "name": "@digitalwalletcorp/synchronized",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "This is a library for making synchronized block",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
   "scripts": {
     "build": "tsc --project tsconfig.build.json",
+    "install:dev": "rm -rf lib dest && find node_modules -mindepth 1 -delete && yarn install",
     "version:patch": "npm version patch",
     "version:minor": "npm version minor",
     "version:major": "npm version major",
@@ -25,7 +26,7 @@
     "type": "git",
     "url": "git+https://github.com/digitalwalletcorp/synchronized.git"
   },
-  "homepage": "https://github.com/digitalwalletcorp/synchronized#readme",
+  "homepage": "https://github.com/digitalwalletcorp/synchronized",
   "bugs": {
     "url": "https://github.com/digitalwalletcorp/synchronized/issues"
   },
@@ -34,10 +35,11 @@
     "src/**/*"
   ],
   "devDependencies": {
-    "@types/jest": "^29.5.14",
-    "jest": "^29.7.0",
-    "ts-jest": "^29.3.4",
+    "@types/jest": "^30.0.0",
+    "@types/node": "24.13.6",
+    "jest": "^30.3.0",
+    "ts-jest": "^29.4.9",
     "ts-node": "^10.9.2",
-    "typescript": "^5.8.3"
+    "typescript": "6.0.3"
   }
 }
